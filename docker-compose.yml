@@ -1,0 +1,155 @@
+---
+# SoftDev Nord Docker Web Development Stack (sdn_stack) 1.0.0
+#
+# Runs Apache, MySQL, PHP, Redis and PhpMyAdmin
+# SSL is preconfigured.
+# Imagemagick and XDebug are activated.
+#
+# Run with
+# docker-compose up -d
+#
+# (C)2021 SoftDev Nord Rene Irrgang
+#
+
+version: '3.7'
+
+volumes:
+  shopware_gartenhaus:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "./gartenhaus-shop"
+
+  shopware_kfzteilefuxx:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "./kfzteilefuxx-shop"
+
+  softdevnord_webwms:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "./webwms"
+
+services:
+
+  # --- MySQL 5.7 for gartenhaus
+  mysql_gartenhaus:
+    container_name: "softdevnord-mysql-gartenhaus"
+    image: bitnami/mysql:5.7
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: rirrgang
+      MYSQL_HOST: localhost
+      MYSQL_PASSWORD: GH2020!#
+      MYSQL_DATABASE: gartenhaus_shopware
+    ports:
+      - "3307:3306"
+    volumes:
+      - ./sql/gartenhaus-test-dump.sql:/docker-entrypoint-initdb.d/gartenhaus-test-dump.sql
+    networks:
+      - app-network
+
+  # --- MySQL 5.7 for kfzteilefuxx
+  mysql_kfzteilefuxx:
+    container_name: "softdevnord-mysql-kfzteilefuxx"
+    image: bitnami/mysql:5.7
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: rirrgang
+      MYSQL_HOST: localhost
+      MYSQL_PASSWORD: GH2020!#
+      MYSQL_DATABASE: kfzteilefuxx_shopware
+    ports:
+      - "3308:3306"
+    volumes:
+      #- ./sql/dump.sql:/docker-entrypoint-initdb.d/:ro
+      - ./.docker/mysql/data:/bitnami/mysql/data
+    networks:
+      - app-network
+
+  # --- MySQL 5.7 for webwms
+  mysql_webwms:
+    container_name: "softdevnord-mysql-webwms"
+    image: bitnami/mysql:5.7
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_USER: rirrgang
+      MYSQL_HOST: localhost
+      MYSQL_PASSWORD: GH2020!#
+      MYSQL_DATABASE: webwms
+    ports:
+      - "3308:3306"
+    volumes:
+      #- ./sql/dump.sql:/docker-entrypoint-initdb.d/:ro
+      - ./.docker/mysql/data:/bitnami/mysql/data
+    networks:
+      - app-network
+
+  # --- PHP 7.3
+  php:
+    container_name: "softdevnord-php"
+    image: bitnami/php-fpm:7.3
+    depends_on:
+      - redis
+    volumes:
+      - ./.docker/www:/app:delegated
+      - ./.docker/php/php.ini:/opt/bitnami/php/etc/conf.d/php.ini:ro
+    networks:
+      - app-network
+
+  # --- Apache 2.4
+  apache:
+    container_name: "softdevnord-apache"
+    image: bitnami/apache:2.4
+    ports:
+      - '80:8080'
+      - '443:8443'
+    depends_on:
+      - php
+    volumes:
+      #- ./.docker/www:/app:delegated
+      #- ./.docker/apache/my_vhost.conf:/vhosts/myapp.conf:ro
+      - ./.docker/apache/certs:/certs
+      # Use this for bitnami's builtin certs:
+      # ./docker/apache/certs:/opt/bitnami/apache2/conf/bitnami/certs
+    networks:
+      - app-network
+
+  # --- Redis 6.0
+  redis:
+    container_name: "softdevnord-redis"
+    image: bitnami/redis:6.0
+    environment:
+      - REDIS_PASSWORD=Apolda8801!#
+    networks:
+      - app-network
+
+  # --- MailHog latest
+  mailhog:
+    container_name: "softdevnord-mailhog"
+    image: mailhog/mailhog:latest
+    ports:
+      - "8025:8025"
+    networks:
+      - app-network
+
+  # --- phpMyAdmin latest
+  phpmyadmin:
+    container_name: "softdevnord-phpmyadmin"
+    image: bitnami/phpmyadmin:latest
+    ports:
+      - "8080:80"
+    environment:
+      PMA_HOST: mysql_gartenhaus
+    networks:
+      - app-network
+
+# --- Docker Networks
+networks:
+  app-network:
+    driver: bridge
